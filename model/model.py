@@ -11,7 +11,8 @@ class GlobalEncoder(keras.layers.Layer):
                                     return_state=True)
 
     def call(self, inputs, *args, **kwargs):
-        return self.gru(inputs)
+        mask = kwargs.get('mask')
+        return self.gru(inputs=inputs, mask=mask)
 
 
 class LocalEncoder(keras.layers.Layer):
@@ -35,8 +36,9 @@ class LocalEncoder(keras.layers.Layer):
         # soft_attention
         # hidden_t = kwargs.get('hidden_t')
         session_hidden = kwargs.get('session_hidden')
+        mask = kwargs.get('mask')
         batch_size = tf.shape(session_hidden)[0]
-        last_state, all_state = self.gru(session_hidden)
+        all_state, last_state = self.gru(inputs=session_hidden, mask=mask)
         # compute the coef of attention
         multi_last_state = tf.tile(last_state, multiples=(1, batch_size, 1))
         alpha = tf.matmul(self.v, tf.sigmoid(self.A1(multi_last_state) + self.A2(all_state)))
@@ -54,16 +56,19 @@ class NARM(keras.models.Model):
         self.B = self.add_weight(shape=(self.emb_size, self.emb_size),
                                  name='B',
                                  dtype=tf.float32)
+        self.dropout_1 = keras.layers.Dropout(rate=0.25)
+        self.dropout_2 = keras.layers.Dropout(rate=0.5)
 
     def call(self, inputs, training=None, mask=None):
         session_hidden = inputs
-        Ct_global = self.globalEncoder(session_hidden)
-        Ct_local = self.localEncoder(session_hidden)
+        drop_session_hidden = self.dropout_1(session_hidden)
+        Ct_global = self.globalEncoder(drop_session_hidden)
+        Ct_local = self.localEncoder(drop_session_hidden)
         Ct = tf.concat([Ct_global, Ct_local], axis=0)
-
+        drop_Ct = self.dropout_2(Ct)
         similarity_score = tf.matmul(tf.matmul(self.item_embeddings(tf.range(self.n_node)),
                                      self.B),
-                                     Ct)
+                                     drop_Ct)
 
         return similarity_score
 
