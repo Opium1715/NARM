@@ -1,5 +1,6 @@
 from functools import partial
 from itertools import chain
+from tqdm import tqdm
 
 import numpy as np
 import tensorflow as tf
@@ -44,14 +45,17 @@ def compute_max_node(sequence):
 
 
 def split_train_val(train_data, split_rate=0.1):
-    session_total = len(train_data)
+    session_total = len(train_data[0])
     split_num = int(session_total * split_rate)
-    val_index = np.random.choice(a=np.arange(session_total + 1), size=split_num, replace=False)
+    val_index = np.random.choice(a=np.arange(0, session_total), size=split_num, replace=False)
     np.random.shuffle(val_index)
-    val_data = [train_data[index] for index in val_index]
-    for index in val_index:
-        del train_data[index]
-    return train_data, val_data
+    val_data = ([train_data[0][index] for index in val_index], [train_data[1][index] for index in val_index])
+    train_index = np.setdiff1d(np.arange(0, session_total), val_index)
+    train_data_new = ([], [])
+    for index in tqdm(train_index, total=len(train_index), desc='分割中'):
+        train_data_new[0].append(train_data[0][index])
+        train_data_new[1].append(train_data[1][index])
+    return train_data_new, val_data
 
 
 class DataLoader:
@@ -75,7 +79,6 @@ class DataLoader:
         dataset = dataset.padded_batch(batch_size=100,  # (session_len, items, reversed_items, mask)
                                        padded_shapes=(
                                            ([],
-                                            [self.max_len],
                                             [self.max_len],
                                             [self.max_len],
                                             ),
