@@ -1,6 +1,5 @@
 from functools import partial
 from itertools import chain
-from tqdm import tqdm
 
 import numpy as np
 import tensorflow as tf
