@@ -18,7 +18,7 @@ def process_data(x, y):
     items = x
     mask = tf.ones(shape=(session_len,))
 
-    sample = (session_len, items, mask)
+    sample = (items, mask)
     labels = y - 1
 
     return sample, labels
@@ -32,10 +32,13 @@ def compute_max_len(raw_data):
     return max_len
 
 
-def compute_item_num(sequence):
-    seq_in_1D = list(chain.from_iterable(sequence))
-    items_num = len(np.unique(seq_in_1D))
-    return items_num
+# def compute_item_num(sequence):
+#     x = sequence[0]
+#     y = sequence[1]
+#     x_seq_in_1D = list(chain.from_iterable(x))
+#     items_num = len(np.unique(x_seq_in_1D))
+#     items_num += len(np.unique(y))
+#     return items_num
 
 
 def compute_max_node(sequence):
@@ -50,12 +53,12 @@ def split_train_val(train_data, split_rate=0.1):
     val_index = np.random.choice(a=np.arange(0, session_total), size=split_num, replace=False)
     np.random.shuffle(val_index)
     val_data = ([train_data[0][index] for index in val_index], [train_data[1][index] for index in val_index])
-    train_index = np.setdiff1d(np.arange(0, session_total), val_index)
-    train_data_new = ([], [])
-    for index in tqdm(train_index, total=len(train_index), desc='分割中'):
-        train_data_new[0].append(train_data[0][index])
-        train_data_new[1].append(train_data[1][index])
-    return train_data_new, val_data
+    # train_index = np.setdiff1d(np.arange(0, session_total), val_index)
+    # train_data_new = ([], [])
+    # for index in tqdm(train_index, total=len(train_index), desc='分割中'):
+    #     train_data_new[0].append(train_data[0][index])
+    #     train_data_new[1].append(train_data[1][index])
+    return val_data
 
 
 class DataLoader:
@@ -73,13 +76,12 @@ class DataLoader:
                                                                                  dtype=tf.int32)))  # (x, label)
         dataset = dataset.map(process_data, num_parallel_calls=tf.data.AUTOTUNE, deterministic=True)
         if self.train_mode:
-            pass
-            # TODO： 训练时打开shuffle，调试时避免减损性能
-            # dataset = dataset.shuffle(buffer_size=len(self.data[0]) - (len(self.data[0]) % 100))
+            # pass
+            # # TODO： 训练时打开shuffle，调试时避免减损性能
+            dataset = dataset.shuffle(buffer_size=len(self.data[0]) - (len(self.data[0]) % 100))
         dataset = dataset.padded_batch(batch_size=100,  # (session_len, items, reversed_items, mask)
                                        padded_shapes=(
-                                           ([],
-                                            [self.max_len],
+                                           ([self.max_len],
                                             [self.max_len],
                                             ),
                                            []),
